@@ -122,6 +122,2879 @@ app.secret_key = os.urandom(24)  # For session management
 # Serve frontend from static directory
 @app.route('/')
 def serve_frontend():
+    try:
+        # Print more debug information
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"Directory contents: {os.listdir('.')}")
+        
+        # Check if frontend/build exists
+        if os.path.exists('frontend'):
+            logger.debug(f"Frontend directory exists. Contents: {os.listdir('frontend')}")
+            if os.path.exists('frontend/build'):
+                logger.debug(f"Frontend/build directory exists. Contents: {os.listdir('frontend/build')}")
+        
+        logger.debug(f"Request for path: ")
+        logger.debug(f"Static folder is: {app.static_folder}")
+        logger.debug(f"Static folder absolute path: {os.path.abspath(app.static_folder)}")
+        print(f"Serving path: ")
+        
+        # Check if index.html exists
+        index_path = os.path.join(app.static_folder, 'index.html')
+        logger.debug(f"Looking for index.html at: {index_path}")
+        logger.debug(f"Absolute path: {os.path.abspath(index_path) if os.path.exists(index_path) else 'Not found'}")
+        
+        if not os.path.exists(index_path):
+            logger.warning(f"WARNING: index.html not found at {index_path}")
+            # Try to create the index.html file directly
+            try:
+                os.makedirs(os.path.dirname(index_path), exist_ok=True)
+                with open(index_path, 'w') as f:
+                    f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+                logger.info("Successfully created index.html file")
+            except Exception as e:
+                logger.error(f"Failed to create index.html file: {str(e)}")
+        
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }}
+        .container {{
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }}
+        .button {{
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }}
+        .button:hover {{
+            background-color: #3a5ce5;
+        }}
+        .error {{
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff3f3;
+            border-left: 4px solid #ff6b6b;
+            color: #666;
+            font-size: 14px;
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>API server is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+        <div class="error">
+            <strong>Note:</strong> The frontend file could not be loaded.<br>
+            Error: {str(e)}
+        </div>
+    </div>
+</body>
+</html>"""
+    except Exception as e:
+        logger.error(f"Unhandled exception in serve_frontend: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+# Initialize managers
+user_manager = UserManagement()
+report_manager = ReportManager()
+report_manager.base_url = os.getenv('BASE_URL', 'http://localhost:8501')
+data_analyzer = DataAnalyzer()
+report_formatter = ReportFormatter()
+
+# Add these configurations at the top of the file after app initialization
+UPLOAD_FOLDER = 'static/logos'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_image(file):
+    """
+    Validates image file for size and dimensions
+    Returns (is_valid, message) tuple
+    """
+    try:
+        # Check file size (max 2MB)
+        MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > MAX_FILE_SIZE:
+            return False, f"Image is too large. Maximum size is 2MB. Your file is {file_size/1024/1024:.2f}MB."
+        
+        # Check dimensions
+        image = Image.open(file)
+        width, height = image.size
+        MAX_DIMENSION = 1500  # Maximum width or height
+        
+        if width > MAX_DIMENSION or height > MAX_DIMENSION:
+            return False, f"Image dimensions are too large. Maximum is {MAX_DIMENSION}x{MAX_DIMENSION} pixels. Your image is {width}x{height}."
+        
+        # Reset file pointer after reading
+        file.seek(0)
+        return True, "Image is valid"
+    except Exception as e:
+        return False, f"Error validating image: {str(e)}"
+
+# Function to ensure a superadmin user exists
+def ensure_superadmin_exists():
+    conn = None
+    try:
+        # Default superadmin credentials
+        username = 'superadmin'
+        password = 'admin123'  # This will be hashed
+        role = 'superadmin'
+        permission_type = 'full'
+        
+        conn = sqlite3.connect('data/users.db')
+        cursor = conn.cursor()
+        
+        # Check if users table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            # Create users table
+            cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT,
+                role TEXT,
+                permission_type TEXT,
+                organization_id INTEGER,
+                email TEXT,
+                created_at TEXT,
+                last_login TEXT
+            )
+            ''')
+            conn.commit()
+        
+        # Check if organizations table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'")
+        if not cursor.fetchone():
+            # Create organizations table
+            cursor.execute('''
+            CREATE TABLE organizations (
+                id INTEGER PRIMARY KEY,
+                name TEXT UNIQUE,
+                created_at TEXT
+            )
+            ''')
+            
+            # Insert a default organization
+            cursor.execute(
+                "INSERT INTO organizations (name, created_at) VALUES (?, ?)",
+                ('System Organization', datetime.now().isoformat())
+            )
+            conn.commit()
+        
+        # Get the system organization ID
+        cursor.execute("SELECT id FROM organizations WHERE name = 'System Organization'")
+        org_id = cursor.fetchone()[0]
+        
+        # Check if superadmin exists
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if not cursor.fetchone():
+            # Create superadmin user
+            hashed_password = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (username, password, role, permission_type, organization_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, hashed_password, role, permission_type, org_id, 'superadmin@example.com', datetime.now().isoformat())
+            )
+            conn.commit()
+            print(f"Superadmin user created. Username: {username}, Password: {password}")
+        else:
+            print("Superadmin user already exists.")
+        
+    except Exception as e:
+        print(f"Error ensuring superadmin exists: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+# Call this function when the app starts
+ensure_superadmin_exists()
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Please log in first')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Role required decorator
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user' not in session or session['user'].get('role') not in roles:
+                flash('Access denied')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def get_dataset_preview_html(dataset_name):
+    """Get HTML preview of dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            df = pd.read_sql_query(f"SELECT * FROM '{dataset_name}' LIMIT 5", conn)
+            return df.to_html(classes='table table-sm', index=False)
+    except Exception as e:
+        print(f"Error getting dataset preview: {str(e)}")
+        return "<div class='alert alert-danger'>Error loading preview</div>"
+
+def get_dataset_row_count(dataset_name):
+    """Get row count for dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM '{dataset_name}'")
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"Error getting row count: {str(e)}")
+        return 0
+
+def get_saved_datasets():
+    """Get list of saved datasets"""
+    try:
+        # Ensure the DB file exists
+        Path('data/tableau_data.db').touch(exist_ok=True)
+        
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            return [table[0] for table in tables if table[0] != 'sqlite_sequence']
+    except Exception as e:
+        print(f"Error getting datasets: {str(e)}")
+        return []
+
+def verify_superadmin(username, password):
+    """Verify superadmin credentials"""
+    try:
+        with sqlite3.connect('data/users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT u.id, u.username, u.role, u.permission_type, u.organization_id, o.name, u.password "
+                "FROM users u JOIN organizations o ON u.organization_id = o.id "
+                "WHERE u.username = ? AND u.role = 'superadmin'",
+                (username,)
+            )
+            user = cursor.fetchone()
+            if user and check_password_hash(user[6], password):
+                return user[0:6]  # Return user data without password
+    except Exception as e:
+        print(f"Error verifying superadmin: {str(e)}")
+    return None
+
+# Application routes
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    try:
+        logger.debug("Login route accessed")
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            # Try superadmin verification first
+            if username == 'superadmin':
+                user = verify_superadmin(username, password)
+                if user:
+                    session['user'] = {
+                        'id': user[0],
+                        'username': user[1],
+                        'role': user[2],
+                        'permission_type': user[3],
+                        'organization_id': user[4],
+                        'organization_name': user[5]
+                    }
+                    flash('Login successful!')
+                    return redirect(url_for('dashboard'))
+            
+            # Regular authentication for other users
+            user = user_manager.verify_user(username, password)
+            if user:
+                session['user'] = {
+                    'id': user[0],
+                    'username': user[1],
+                    'role': user[2],
+                    'permission_type': user[3],
+                    'organization_id': user[4],
+                    'organization_name': user[5]
+                }
+                flash('Login successful!')
+                return redirect(url_for('dashboard'))
+            flash('Invalid credentials')
+        
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Login - Tableau Data Reporter</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding-top: 40px; }
+                    .form-signin {
+                        width: 100%;
+                        max-width: 330px;
+                        padding: 15px;
+                        margin: auto;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="form-signin text-center">
+                        <h1 class="h3 mb-3">Tableau Data Reporter</h1>
+                        {% with messages = get_flashed_messages() %}
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-info">{{ message }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                        <form method="post">
+                            <div class="form-floating mb-3">
+                                <input type="text" class="form-control" name="username" placeholder="Username" required>
+                                <label>Username</label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input type="password" class="form-control" name="password" placeholder="Password" required>
+                                <label>Password</label>
+                            </div>
+                            <button class="w-100 btn btn-lg btn-primary" type="submit">Login</button>
+                            <p class="mt-3">
+                                <a href="{{ url_for('register') }}">Register new account</a>
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ''')
+    except Exception as e:
+        logger.error(f"Unhandled exception in login route: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not all([username, email, password, confirm_password]):
+            flash('All fields are required')
+        elif password != confirm_password:
+            flash('Passwords do not match')
+        else:
+            try:
+                if user_manager.add_user_to_org(
+                    username=username,
+                    password=password,
+                    org_id=None,
+                    permission_type='normal',
+                    email=email
+                ):
+                    flash('Registration successful! Please login.')
+                    return redirect(url_for('dashboard'))
+            except ValueError as e:
+                flash(str(e))
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Register - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { padding-top: 40px; }
+                .form-signin {
+                    width: 100%;
+                    max-width: 330px;
+                    padding: 15px;
+                    margin: auto;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="form-signin text-center">
+                    <h1 class="h3 mb-3">Register New Account</h1>
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-info">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    <form method="post">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" name="username" placeholder="Username" required>
+                            <label>Username</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="email" class="form-control" name="email" placeholder="Email" required>
+                            <label>Email</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="password" placeholder="Password" required>
+                            <label>Password</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="confirm_password" placeholder="Confirm Password" required>
+                            <label>Confirm Password</label>
+                        </div>
+                        <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
+                        <p class="mt-3">
+                            <a href="{{ url_for('login') }}">Back to login</a>
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/dashboard')
+def home():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    user_role = session['user'].get('role')
+    if user_role == 'superadmin':
+        return redirect(url_for('admin_dashboard'))
+    elif user_role == 'power':
+        return redirect(url_for('power_user_dashboard'))
+    else:
+        return redirect(url_for('normal_user_dashboard'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully')
+    return redirect(url_for('login'))
+
+# Catch-all route to handle frontend routing - MUST BE LAST ROUTE
+@app.route('/<path:path>')
+def catch_all(path):
+    logger.debug(f"Request for path: {path}")
+    
+    # First try to send as a static file
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.debug(f"Error serving static file: {str(e)}")
+        # If not a static file, serve the index.html for SPA routing
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
+
+from flask import Flask, render_template_string, redirect, url_for, request, jsonify, send_from_directory, session, flash
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+import sqlite3
+from user_management import UserManagement
+from report_manager_new import ReportManager
+from data_analyzer import DataAnalyzer
+from report_formatter_new import ReportFormatter
+from tableau_utils import authenticate, get_workbooks, download_and_save_data, generate_table_name
+import pytz
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import pandas as pd
+from dotenv import load_dotenv
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from werkzeug.utils import secure_filename
+import uuid
+import hashlib
+import shutil
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color
+from reportlab.graphics.shapes import Image
+from reportlab.platypus import Spacer
+from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('app')
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure all required directories exist
+from setup import ensure_directories
+ensure_directories()
+
+# Use writeable directory for Heroku
+STATIC_FOLDER = '/tmp/frontend/build'
+if os.environ.get('DYNO'):  # Check if running on Heroku
+    # Create directory if it doesn't exist
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+    # Write index.html to this directory
+    with open(os.path.join(STATIC_FOLDER, 'index.html'), 'w') as f:
+        f.write("""<!DOCTYPE html>
+<html lang="en">
+from flask import Flask, render_template_string, redirect, url_for, request, jsonify, send_from_directory, session, flash
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+import sqlite3
+from user_management import UserManagement
+from report_manager_new import ReportManager
+from data_analyzer import DataAnalyzer
+from report_formatter_new import ReportFormatter
+from tableau_utils import authenticate, get_workbooks, download_and_save_data, generate_table_name
+import pytz
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import pandas as pd
+from dotenv import load_dotenv
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from werkzeug.utils import secure_filename
+import uuid
+import hashlib
+import shutil
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color
+from reportlab.graphics.shapes import Image
+from reportlab.platypus import Spacer
+from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('app')
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure all required directories exist
+from setup import ensure_directories
+ensure_directories()
+
+# Use writeable directory for Heroku
+STATIC_FOLDER = '/tmp/frontend/build'
+if os.environ.get('DYNO'):  # Check if running on Heroku
+    # Create directory if it doesn't exist
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+    # Write index.html to this directory
+    with open(os.path.join(STATIC_FOLDER, 'index.html'), 'w') as f:
+        f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+else:
+    STATIC_FOLDER = 'frontend/build'
+
+# Create Flask app with proper static file configuration
+app = Flask(__name__, 
+            static_folder=STATIC_FOLDER,
+            static_url_path='/')
+app.secret_key = os.urandom(24)  # For session management
+
+# Serve frontend from static directory
+@app.route('/')
+def serve_frontend():
+    try:
+        # Print more debug information
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"Directory contents: {os.listdir('.')}")
+        
+        # Check if frontend/build exists
+        if os.path.exists('frontend'):
+            logger.debug(f"Frontend directory exists. Contents: {os.listdir('frontend')}")
+            if os.path.exists('frontend/build'):
+                logger.debug(f"Frontend/build directory exists. Contents: {os.listdir('frontend/build')}")
+        
+        logger.debug(f"Request for path: ")
+        logger.debug(f"Static folder is: {app.static_folder}")
+        logger.debug(f"Static folder absolute path: {os.path.abspath(app.static_folder)}")
+        print(f"Serving path: ")
+        
+        # Check if index.html exists
+        index_path = os.path.join(app.static_folder, 'index.html')
+        logger.debug(f"Looking for index.html at: {index_path}")
+        logger.debug(f"Absolute path: {os.path.abspath(index_path) if os.path.exists(index_path) else 'Not found'}")
+        
+        if not os.path.exists(index_path):
+            logger.warning(f"WARNING: index.html not found at {index_path}")
+            # Try to create the index.html file directly
+            try:
+                os.makedirs(os.path.dirname(index_path), exist_ok=True)
+                with open(index_path, 'w') as f:
+                    f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+                logger.info("Successfully created index.html file")
+            except Exception as e:
+                logger.error(f"Failed to create index.html file: {str(e)}")
+        
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }}
+        .container {{
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }}
+        .button {{
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }}
+        .button:hover {{
+            background-color: #3a5ce5;
+        }}
+        .error {{
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff3f3;
+            border-left: 4px solid #ff6b6b;
+            color: #666;
+            font-size: 14px;
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>API server is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+        <div class="error">
+            <strong>Note:</strong> The frontend file could not be loaded.<br>
+            Error: {str(e)}
+        </div>
+    </div>
+</body>
+</html>"""
+    except Exception as e:
+        logger.error(f"Unhandled exception in serve_frontend: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+# Initialize managers
+user_manager = UserManagement()
+report_manager = ReportManager()
+report_manager.base_url = os.getenv('BASE_URL', 'http://localhost:8501')
+data_analyzer = DataAnalyzer()
+report_formatter = ReportFormatter()
+
+# Add these configurations at the top of the file after app initialization
+UPLOAD_FOLDER = 'static/logos'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_image(file):
+    """
+    Validates image file for size and dimensions
+    Returns (is_valid, message) tuple
+    """
+    try:
+        # Check file size (max 2MB)
+        MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > MAX_FILE_SIZE:
+            return False, f"Image is too large. Maximum size is 2MB. Your file is {file_size/1024/1024:.2f}MB."
+        
+        # Check dimensions
+        image = Image.open(file)
+        width, height = image.size
+        MAX_DIMENSION = 1500  # Maximum width or height
+        
+        if width > MAX_DIMENSION or height > MAX_DIMENSION:
+            return False, f"Image dimensions are too large. Maximum is {MAX_DIMENSION}x{MAX_DIMENSION} pixels. Your image is {width}x{height}."
+        
+        # Reset file pointer after reading
+        file.seek(0)
+        return True, "Image is valid"
+    except Exception as e:
+        return False, f"Error validating image: {str(e)}"
+
+# Function to ensure a superadmin user exists
+def ensure_superadmin_exists():
+    conn = None
+    try:
+        # Default superadmin credentials
+        username = 'superadmin'
+        password = 'admin123'  # This will be hashed
+        role = 'superadmin'
+        permission_type = 'full'
+        
+        conn = sqlite3.connect('data/users.db')
+        cursor = conn.cursor()
+        
+        # Check if users table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            # Create users table
+            cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT,
+                role TEXT,
+                permission_type TEXT,
+                organization_id INTEGER,
+                email TEXT,
+                created_at TEXT,
+                last_login TEXT
+            )
+            ''')
+            conn.commit()
+        
+        # Check if organizations table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'")
+        if not cursor.fetchone():
+            # Create organizations table
+            cursor.execute('''
+            CREATE TABLE organizations (
+                id INTEGER PRIMARY KEY,
+                name TEXT UNIQUE,
+                created_at TEXT
+            )
+            ''')
+            
+            # Insert a default organization
+            cursor.execute(
+                "INSERT INTO organizations (name, created_at) VALUES (?, ?)",
+                ('System Organization', datetime.now().isoformat())
+            )
+            conn.commit()
+        
+        # Get the system organization ID
+        cursor.execute("SELECT id FROM organizations WHERE name = 'System Organization'")
+        org_id = cursor.fetchone()[0]
+        
+        # Check if superadmin exists
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if not cursor.fetchone():
+            # Create superadmin user
+            hashed_password = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (username, password, role, permission_type, organization_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, hashed_password, role, permission_type, org_id, 'superadmin@example.com', datetime.now().isoformat())
+            )
+            conn.commit()
+            print(f"Superadmin user created. Username: {username}, Password: {password}")
+        else:
+            print("Superadmin user already exists.")
+        
+    except Exception as e:
+        print(f"Error ensuring superadmin exists: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+# Call this function when the app starts
+ensure_superadmin_exists()
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Please log in first')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Role required decorator
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user' not in session or session['user'].get('role') not in roles:
+                flash('Access denied')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def get_dataset_preview_html(dataset_name):
+    """Get HTML preview of dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            df = pd.read_sql_query(f"SELECT * FROM '{dataset_name}' LIMIT 5", conn)
+            return df.to_html(classes='table table-sm', index=False)
+    except Exception as e:
+        print(f"Error getting dataset preview: {str(e)}")
+        return "<div class='alert alert-danger'>Error loading preview</div>"
+
+def get_dataset_row_count(dataset_name):
+    """Get row count for dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM '{dataset_name}'")
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"Error getting row count: {str(e)}")
+        return 0
+
+def get_saved_datasets():
+    """Get list of saved datasets"""
+    try:
+        # Ensure the DB file exists
+        Path('data/tableau_data.db').touch(exist_ok=True)
+        
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            return [table[0] for table in tables if table[0] != 'sqlite_sequence']
+    except Exception as e:
+        print(f"Error getting datasets: {str(e)}")
+        return []
+
+def verify_superadmin(username, password):
+    """Verify superadmin credentials"""
+    try:
+        with sqlite3.connect('data/users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT u.id, u.username, u.role, u.permission_type, u.organization_id, o.name, u.password "
+                "FROM users u JOIN organizations o ON u.organization_id = o.id "
+                "WHERE u.username = ? AND u.role = 'superadmin'",
+                (username,)
+            )
+            user = cursor.fetchone()
+            if user and check_password_hash(user[6], password):
+                return user[0:6]  # Return user data without password
+    except Exception as e:
+        print(f"Error verifying superadmin: {str(e)}")
+    return None
+
+# Application routes
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    try:
+        logger.debug("Login route accessed")
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            # Try superadmin verification first
+            if username == 'superadmin':
+                user = verify_superadmin(username, password)
+                if user:
+                    session['user'] = {
+                        'id': user[0],
+                        'username': user[1],
+                        'role': user[2],
+                        'permission_type': user[3],
+                        'organization_id': user[4],
+                        'organization_name': user[5]
+                    }
+                    flash('Login successful!')
+                    return redirect(url_for('dashboard'))
+            
+            # Regular authentication for other users
+            user = user_manager.verify_user(username, password)
+            if user:
+                session['user'] = {
+                    'id': user[0],
+                    'username': user[1],
+                    'role': user[2],
+                    'permission_type': user[3],
+                    'organization_id': user[4],
+                    'organization_name': user[5]
+                }
+                flash('Login successful!')
+                return redirect(url_for('dashboard'))
+            flash('Invalid credentials')
+        
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Login - Tableau Data Reporter</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding-top: 40px; }
+                    .form-signin {
+                        width: 100%;
+                        max-width: 330px;
+                        padding: 15px;
+                        margin: auto;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="form-signin text-center">
+                        <h1 class="h3 mb-3">Tableau Data Reporter</h1>
+                        {% with messages = get_flashed_messages() %}
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-info">{{ message }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                        <form method="post">
+                            <div class="form-floating mb-3">
+                                <input type="text" class="form-control" name="username" placeholder="Username" required>
+                                <label>Username</label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input type="password" class="form-control" name="password" placeholder="Password" required>
+                                <label>Password</label>
+                            </div>
+                            <button class="w-100 btn btn-lg btn-primary" type="submit">Login</button>
+                            <p class="mt-3">
+                                <a href="{{ url_for('register') }}">Register new account</a>
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ''')
+    except Exception as e:
+        logger.error(f"Unhandled exception in login route: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not all([username, email, password, confirm_password]):
+            flash('All fields are required')
+        elif password != confirm_password:
+            flash('Passwords do not match')
+        else:
+            try:
+                if user_manager.add_user_to_org(
+                    username=username,
+                    password=password,
+                    org_id=None,
+                    permission_type='normal',
+                    email=email
+                ):
+                    flash('Registration successful! Please login.')
+                    return redirect(url_for('dashboard'))
+            except ValueError as e:
+                flash(str(e))
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Register - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { padding-top: 40px; }
+                .form-signin {
+                    width: 100%;
+                    max-width: 330px;
+                    padding: 15px;
+                    margin: auto;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="form-signin text-center">
+                    <h1 class="h3 mb-3">Register New Account</h1>
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-info">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    <form method="post">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" name="username" placeholder="Username" required>
+                            <label>Username</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="email" class="form-control" name="email" placeholder="Email" required>
+                            <label>Email</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="password" placeholder="Password" required>
+                            <label>Password</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="confirm_password" placeholder="Confirm Password" required>
+                            <label>Confirm Password</label>
+                        </div>
+                        <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
+                        <p class="mt-3">
+                            <a href="{{ url_for('login') }}">Back to login</a>
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/dashboard')
+def home():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    user_role = session['user'].get('role')
+    if user_role == 'superadmin':
+        return redirect(url_for('admin_dashboard'))
+    elif user_role == 'power':
+        return redirect(url_for('power_user_dashboard'))
+    else:
+        return redirect(url_for('normal_user_dashboard'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully')
+    return redirect(url_for('login'))
+
+# Catch-all route to handle frontend routing - MUST BE LAST ROUTE
+@app.route('/<path:path>')
+def catch_all(path):
+    logger.debug(f"Request for path: {path}")
+    
+    # First try to send as a static file
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.debug(f"Error serving static file: {str(e)}")
+        # If not a static file, serve the index.html for SPA routing
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
+
+from flask import Flask, render_template_string, redirect, url_for, request, jsonify, send_from_directory, session, flash
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+import sqlite3
+from user_management import UserManagement
+from report_manager_new import ReportManager
+from data_analyzer import DataAnalyzer
+from report_formatter_new import ReportFormatter
+from tableau_utils import authenticate, get_workbooks, download_and_save_data, generate_table_name
+import pytz
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import pandas as pd
+from dotenv import load_dotenv
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from werkzeug.utils import secure_filename
+import uuid
+import hashlib
+import shutil
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color
+from reportlab.graphics.shapes import Image
+from reportlab.platypus import Spacer
+from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('app')
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure all required directories exist
+from setup import ensure_directories
+ensure_directories()
+
+# Use writeable directory for Heroku
+STATIC_FOLDER = '/tmp/frontend/build'
+if os.environ.get('DYNO'):  # Check if running on Heroku
+    # Create directory if it doesn't exist
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+    # Write index.html to this directory
+    with open(os.path.join(STATIC_FOLDER, 'index.html'), 'w') as f:
+        f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+else:
+    STATIC_FOLDER = 'frontend/build'
+
+# Create Flask app with proper static file configuration
+app = Flask(__name__, 
+            static_folder=STATIC_FOLDER,
+            static_url_path='/')
+app.secret_key = os.urandom(24)  # For session management
+
+# Serve frontend from static directory
+@app.route('/')
+def serve_frontend():
+    try:
+        # Print more debug information
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"Directory contents: {os.listdir('.')}")
+        
+        # Check if frontend/build exists
+        if os.path.exists('frontend'):
+            logger.debug(f"Frontend directory exists. Contents: {os.listdir('frontend')}")
+            if os.path.exists('frontend/build'):
+                logger.debug(f"Frontend/build directory exists. Contents: {os.listdir('frontend/build')}")
+        
+        logger.debug(f"Request for path: ")
+        logger.debug(f"Static folder is: {app.static_folder}")
+        logger.debug(f"Static folder absolute path: {os.path.abspath(app.static_folder)}")
+        print(f"Serving path: ")
+        
+        # Check if index.html exists
+        index_path = os.path.join(app.static_folder, 'index.html')
+        logger.debug(f"Looking for index.html at: {index_path}")
+        logger.debug(f"Absolute path: {os.path.abspath(index_path) if os.path.exists(index_path) else 'Not found'}")
+        
+        if not os.path.exists(index_path):
+            logger.warning(f"WARNING: index.html not found at {index_path}")
+            # Try to create the index.html file directly
+            try:
+                os.makedirs(os.path.dirname(index_path), exist_ok=True)
+                with open(index_path, 'w') as f:
+                    f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+                logger.info("Successfully created index.html file")
+            except Exception as e:
+                logger.error(f"Failed to create index.html file: {str(e)}")
+        
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }}
+        .container {{
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }}
+        .button {{
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }}
+        .button:hover {{
+            background-color: #3a5ce5;
+        }}
+        .error {{
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff3f3;
+            border-left: 4px solid #ff6b6b;
+            color: #666;
+            font-size: 14px;
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>API server is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+        <div class="error">
+            <strong>Note:</strong> The frontend file could not be loaded.<br>
+            Error: {str(e)}
+        </div>
+    </div>
+</body>
+</html>"""
+    except Exception as e:
+        logger.error(f"Unhandled exception in serve_frontend: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+# Initialize managers
+user_manager = UserManagement()
+report_manager = ReportManager()
+report_manager.base_url = os.getenv('BASE_URL', 'http://localhost:8501')
+data_analyzer = DataAnalyzer()
+report_formatter = ReportFormatter()
+
+# Add these configurations at the top of the file after app initialization
+UPLOAD_FOLDER = 'static/logos'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_image(file):
+    """
+    Validates image file for size and dimensions
+    Returns (is_valid, message) tuple
+    """
+    try:
+        # Check file size (max 2MB)
+        MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > MAX_FILE_SIZE:
+            return False, f"Image is too large. Maximum size is 2MB. Your file is {file_size/1024/1024:.2f}MB."
+        
+        # Check dimensions
+        image = Image.open(file)
+        width, height = image.size
+        MAX_DIMENSION = 1500  # Maximum width or height
+        
+        if width > MAX_DIMENSION or height > MAX_DIMENSION:
+            return False, f"Image dimensions are too large. Maximum is {MAX_DIMENSION}x{MAX_DIMENSION} pixels. Your image is {width}x{height}."
+        
+        # Reset file pointer after reading
+        file.seek(0)
+        return True, "Image is valid"
+    except Exception as e:
+        return False, f"Error validating image: {str(e)}"
+
+# Function to ensure a superadmin user exists
+def ensure_superadmin_exists():
+    conn = None
+    try:
+        # Default superadmin credentials
+        username = 'superadmin'
+        password = 'admin123'  # This will be hashed
+        role = 'superadmin'
+        permission_type = 'full'
+        
+        conn = sqlite3.connect('data/users.db')
+        cursor = conn.cursor()
+        
+        # Check if users table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            # Create users table
+            cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT,
+                role TEXT,
+                permission_type TEXT,
+                organization_id INTEGER,
+                email TEXT,
+                created_at TEXT,
+                last_login TEXT
+            )
+            ''')
+            conn.commit()
+        
+        # Check if organizations table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'")
+        if not cursor.fetchone():
+            # Create organizations table
+            cursor.execute('''
+            CREATE TABLE organizations (
+                id INTEGER PRIMARY KEY,
+                name TEXT UNIQUE,
+                created_at TEXT
+            )
+            ''')
+            
+            # Insert a default organization
+            cursor.execute(
+                "INSERT INTO organizations (name, created_at) VALUES (?, ?)",
+                ('System Organization', datetime.now().isoformat())
+            )
+            conn.commit()
+        
+        # Get the system organization ID
+        cursor.execute("SELECT id FROM organizations WHERE name = 'System Organization'")
+        org_id = cursor.fetchone()[0]
+        
+        # Check if superadmin exists
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if not cursor.fetchone():
+            # Create superadmin user
+            hashed_password = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (username, password, role, permission_type, organization_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, hashed_password, role, permission_type, org_id, 'superadmin@example.com', datetime.now().isoformat())
+            )
+            conn.commit()
+            print(f"Superadmin user created. Username: {username}, Password: {password}")
+        else:
+            print("Superadmin user already exists.")
+        
+    except Exception as e:
+        print(f"Error ensuring superadmin exists: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+# Call this function when the app starts
+ensure_superadmin_exists()
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Please log in first')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Role required decorator
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user' not in session or session['user'].get('role') not in roles:
+                flash('Access denied')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def get_dataset_preview_html(dataset_name):
+    """Get HTML preview of dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            df = pd.read_sql_query(f"SELECT * FROM '{dataset_name}' LIMIT 5", conn)
+            return df.to_html(classes='table table-sm', index=False)
+    except Exception as e:
+        print(f"Error getting dataset preview: {str(e)}")
+        return "<div class='alert alert-danger'>Error loading preview</div>"
+
+def get_dataset_row_count(dataset_name):
+    """Get row count for dataset"""
+    try:
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM '{dataset_name}'")
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"Error getting row count: {str(e)}")
+        return 0
+
+def get_saved_datasets():
+    """Get list of saved datasets"""
+    try:
+        # Ensure the DB file exists
+        Path('data/tableau_data.db').touch(exist_ok=True)
+        
+        with sqlite3.connect('data/tableau_data.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            return [table[0] for table in tables if table[0] != 'sqlite_sequence']
+    except Exception as e:
+        print(f"Error getting datasets: {str(e)}")
+        return []
+
+def verify_superadmin(username, password):
+    """Verify superadmin credentials"""
+    try:
+        with sqlite3.connect('data/users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT u.id, u.username, u.role, u.permission_type, u.organization_id, o.name, u.password "
+                "FROM users u JOIN organizations o ON u.organization_id = o.id "
+                "WHERE u.username = ? AND u.role = 'superadmin'",
+                (username,)
+            )
+            user = cursor.fetchone()
+            if user and check_password_hash(user[6], password):
+                return user[0:6]  # Return user data without password
+    except Exception as e:
+        print(f"Error verifying superadmin: {str(e)}")
+    return None
+
+# Application routes
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    try:
+        logger.debug("Login route accessed")
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            # Try superadmin verification first
+            if username == 'superadmin':
+                user = verify_superadmin(username, password)
+                if user:
+                    session['user'] = {
+                        'id': user[0],
+                        'username': user[1],
+                        'role': user[2],
+                        'permission_type': user[3],
+                        'organization_id': user[4],
+                        'organization_name': user[5]
+                    }
+                    flash('Login successful!')
+                    return redirect(url_for('dashboard'))
+            
+            # Regular authentication for other users
+            user = user_manager.verify_user(username, password)
+            if user:
+                session['user'] = {
+                    'id': user[0],
+                    'username': user[1],
+                    'role': user[2],
+                    'permission_type': user[3],
+                    'organization_id': user[4],
+                    'organization_name': user[5]
+                }
+                flash('Login successful!')
+                return redirect(url_for('dashboard'))
+            flash('Invalid credentials')
+        
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Login - Tableau Data Reporter</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding-top: 40px; }
+                    .form-signin {
+                        width: 100%;
+                        max-width: 330px;
+                        padding: 15px;
+                        margin: auto;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="form-signin text-center">
+                        <h1 class="h3 mb-3">Tableau Data Reporter</h1>
+                        {% with messages = get_flashed_messages() %}
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-info">{{ message }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                        <form method="post">
+                            <div class="form-floating mb-3">
+                                <input type="text" class="form-control" name="username" placeholder="Username" required>
+                                <label>Username</label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input type="password" class="form-control" name="password" placeholder="Password" required>
+                                <label>Password</label>
+                            </div>
+                            <button class="w-100 btn btn-lg btn-primary" type="submit">Login</button>
+                            <p class="mt-3">
+                                <a href="{{ url_for('register') }}">Register new account</a>
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ''')
+    except Exception as e:
+        logger.error(f"Unhandled exception in login route: {str(e)}")
+        return str(e), 500  # Return a 500 error with the exception message
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not all([username, email, password, confirm_password]):
+            flash('All fields are required')
+        elif password != confirm_password:
+            flash('Passwords do not match')
+        else:
+            try:
+                if user_manager.add_user_to_org(
+                    username=username,
+                    password=password,
+                    org_id=None,
+                    permission_type='normal',
+                    email=email
+                ):
+                    flash('Registration successful! Please login.')
+                    return redirect(url_for('dashboard'))
+            except ValueError as e:
+                flash(str(e))
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Register - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { padding-top: 40px; }
+                .form-signin {
+                    width: 100%;
+                    max-width: 330px;
+                    padding: 15px;
+                    margin: auto;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="form-signin text-center">
+                    <h1 class="h3 mb-3">Register New Account</h1>
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-info">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    <form method="post">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" name="username" placeholder="Username" required>
+                            <label>Username</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="email" class="form-control" name="email" placeholder="Email" required>
+                            <label>Email</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="password" placeholder="Password" required>
+                            <label>Password</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" name="confirm_password" placeholder="Confirm Password" required>
+                            <label>Confirm Password</label>
+                        </div>
+                        <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
+                        <p class="mt-3">
+                            <a href="{{ url_for('login') }}">Back to login</a>
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/dashboard')
+def home():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    user_role = session['user'].get('role')
+    if user_role == 'superadmin':
+        return redirect(url_for('admin_dashboard'))
+    elif user_role == 'power':
+        return redirect(url_for('power_user_dashboard'))
+    else:
+        return redirect(url_for('normal_user_dashboard'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully')
+    return redirect(url_for('login'))
+
+# Catch-all route to handle frontend routing - MUST BE LAST ROUTE
+@app.route('/<path:path>')
+def catch_all(path):
+    logger.debug(f"Request for path: {path}")
+    
+    # First try to send as a static file
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.debug(f"Error serving static file: {str(e)}")
+        # If not a static file, serve the index.html for SPA routing
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
+
+@app.route('/normal-user')
+@login_required
+@role_required(['normal'])
+def normal_user_dashboard():
+    datasets = get_saved_datasets()
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Dashboard - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+            <style>
+                .sidebar {
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    left: 0;
+                    z-index: 100;
+                    padding: 48px 0 0;
+                    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+                }
+                .main {
+                    margin-left: 240px;
+                    padding: 20px;
+                }
+                .nav-link {
+                    padding: 0.5rem 1rem;
+                    font-size: 0.9rem;
+                }
+                .nav-link i {
+                    margin-right: 8px;
+                    width: 20px;
+                    text-align: center;
+                }
+                .nav-link.active {
+                    font-weight: bold;
+                    background-color: rgba(0, 123, 255, 0.1);
+                }
+                .card-actions {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 15px;
+                }
+                .delete-btn {
+                    color: #dc3545;
+                }
+                .delete-btn:hover {
+                    color: #bd2130;
+                }
+            </style>
+        </head>
+        <body>
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <div class="px-3">
+                        <h5>👤 User Profile</h5>
+                        <p><strong>Username:</strong> {{ session.user.username }}</p>
+                        <p><strong>Role:</strong> {{ session.user.role }}</p>
+                    </div>
+                    <hr>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{{ url_for('normal_user_dashboard') }}">
+                                <i class="bi bi-house"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tableau_connect') }}">
+                                <i class="bi bi-box-arrow-in-right"></i> Connect to Tableau
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('schedule_reports') }}">
+                                <i class="bi bi-calendar-plus"></i> Create Schedule
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('manage_schedules') }}">
+                                <i class="bi bi-calendar-check"></i> Manage Schedules
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="main">
+                <div class="container">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-info">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <h1 class="mb-4">Your Datasets</h1>
+                    
+                    {% if datasets %}
+                        <div class="row">
+                            {% for dataset in datasets %}
+                                <div class="col-md-4 mb-4">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ dataset }}</h5>
+                                            <h6 class="card-subtitle mb-2 text-muted">
+                                                <small>{{ get_dataset_row_count(dataset) }} rows</small>
+                                            </h6>
+                                            <div class="card-actions">
+                                                <div>
+                                            <a href="#" class="card-link" 
+                                               onclick="viewDatasetPreview('{{ dataset }}')">View Preview</a>
+                                            <a href="{{ url_for('schedule_dataset', dataset=dataset) }}" 
+                                               class="card-link">Create Schedule</a>
+                                                </div>
+                                                <div>
+                                                    <a href="#" class="delete-btn" onclick="confirmDelete('{{ dataset }}')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p>No datasets available. Please connect to Tableau and download data first.</p>
+                            <a href="{{ url_for('tableau_connect') }}" class="btn btn-primary">
+                                <i class="bi bi-box-arrow-in-right"></i> Connect to Tableau
+                            </a>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Dataset Preview Modal -->
+                    <div class="modal fade" id="datasetPreviewModal" tabindex="-1">
+                        <div class="modal-dialog modal-xl">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Dataset Preview: <span id="datasetName"></span></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div id="datasetPreview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Confirmation Modal -->
+                    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Confirm Delete</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to delete the dataset: <strong id="deleteDatasetName"></strong>?</p>
+                                    <p class="text-danger">This action cannot be undone.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Dataset</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+            <script>
+                function viewDatasetPreview(dataset) {
+                    document.getElementById('datasetName').textContent = dataset;
+                    const previewDiv = document.getElementById('datasetPreview');
+                    previewDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading preview...</p></div>';
+                    
+                    // Show modal
+                    const modal = new bootstrap.Modal(document.getElementById('datasetPreviewModal'));
+                    modal.show();
+                    
+                    // Fetch preview
+                    fetch(`/api/datasets/${dataset}/preview`)
+                        .then(response => response.text())
+                        .then(html => {
+                            previewDiv.innerHTML = html;
+                        })
+                        .catch(error => {
+                            previewDiv.innerHTML = `<div class="alert alert-danger">Failed to load preview: ${error}</div>`;
+                        });
+                }
+                
+                function confirmDelete(dataset) {
+                    // Set the dataset name in the modal
+                    document.getElementById('deleteDatasetName').textContent = dataset;
+                    
+                    // Show confirmation modal
+                    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    modal.show();
+                    
+                    // Setup confirm button action
+                    const confirmBtn = document.getElementById('confirmDeleteBtn');
+                    
+                    // Remove any existing event listeners
+                    const newConfirmBtn = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                    
+                    // Add new event listener
+                    newConfirmBtn.addEventListener('click', function() {
+                        deleteDataset(dataset, modal);
+                    });
+                }
+                
+                function deleteDataset(dataset, modal) {
+                    // Show loading state
+                    const confirmBtn = document.getElementById('confirmDeleteBtn');
+                    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+                    confirmBtn.disabled = true;
+                    
+                    // Delete the dataset
+                    fetch(`/api/datasets/${dataset}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Hide modal
+                        modal.hide();
+                        
+                        if (data.success) {
+                            // Show success message
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                            alertDiv.innerHTML = `
+                                Dataset <strong>${dataset}</strong> has been deleted successfully.
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            `;
+                            document.querySelector('.container').prepend(alertDiv);
+                            
+                            // Remove dataset card from page
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            // Show error message
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                            alertDiv.innerHTML = `
+                                Failed to delete dataset: ${data.error || 'Unknown error'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            `;
+                            document.querySelector('.container').prepend(alertDiv);
+                        }
+                    })
+                    .catch(error => {
+                        // Hide modal
+                        modal.hide();
+                        
+                        // Show error message
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                        alertDiv.innerHTML = `
+                            Failed to delete dataset: ${error.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        `;
+                        document.querySelector('.container').prepend(alertDiv);
+                        });
+                }
+            </script>
+        </body>
+        </html>
+    ''', datasets=datasets)
+
+@app.route('/power-user')
+@login_required
+@role_required(['power'])
+def power_user_dashboard():
+    datasets = get_saved_datasets()
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Power User Dashboard - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+            <style>
+                .sidebar {
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    left: 0;
+                    z-index: 100;
+                    padding: 48px 0 0;
+                    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+                }
+                .main {
+                    margin-left: 240px;
+                    padding: 20px;
+                }
+                .nav-link {
+                    padding: 0.5rem 1rem;
+                    font-size: 0.9rem;
+                }
+                .nav-link i {
+                    margin-right: 8px;
+                    width: 20px;
+                    text-align: center;
+                }
+                .nav-link.active {
+                    font-weight: bold;
+                    background-color: rgba(0, 123, 255, 0.1);
+                }
+                .card-actions {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 15px;
+                }
+                .delete-btn {
+                    color: #dc3545;
+                }
+                .delete-btn:hover {
+                    color: #bd2130;
+                }
+            </style>
+        </head>
+        <body>
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <div class="px-3">
+                        <h5>👤 User Profile</h5>
+                        <p><strong>Username:</strong> {{ session.user.username }}</p>
+                        <p><strong>Role:</strong> {{ session.user.role }}</p>
+                    </div>
+                    <hr>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{{ url_for('power_user_dashboard') }}">
+                                <i class="bi bi-house"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tableau_connect') }}">
+                                <i class="bi bi-box-arrow-in-right"></i> Connect to Tableau
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('qa_page') }}">
+                                <i class="bi bi-question-circle"></i> Ask Questions
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('schedule_reports') }}">
+                                <i class="bi bi-calendar-plus"></i> Create Schedule
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('manage_schedules') }}">
+                                <i class="bi bi-calendar-check"></i> Manage Schedules
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="main">
+                <div class="container">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-info">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <h1 class="mb-4">Your Datasets</h1>
+                    
+                    {% if datasets %}
+                        <div class="row">
+                            {% for dataset in datasets %}
+                                <div class="col-md-4 mb-4">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ dataset }}</h5>
+                                            <h6 class="card-subtitle mb-2 text-muted">
+                                                <small>{{ get_dataset_row_count(dataset) }} rows</small>
+                                            </h6>
+                                            <div class="card-actions">
+                                            <div class="btn-group">
+                                                <a href="#" class="btn btn-sm btn-outline-primary" 
+                                                onclick="viewDatasetPreview('{{ dataset }}')">
+                                                    <i class="bi bi-table"></i> View Preview
+                                                </a>
+                                                <a href="{{ url_for('qa_page') }}?dataset={{ dataset }}" 
+                                                class="btn btn-sm btn-outline-success">
+                                                    <i class="bi bi-question-circle"></i> Ask Questions
+                                                </a>
+                                                <a href="{{ url_for('schedule_dataset', dataset=dataset) }}" 
+                                                class="btn btn-sm btn-outline-info">
+                                                    <i class="bi bi-calendar-plus"></i> Schedule
+                                                </a>
+                                                </div>
+                                                <div>
+                                                    <a href="#" class="delete-btn" onclick="confirmDelete('{{ dataset }}')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p>No datasets available. Please connect to Tableau and download data first.</p>
+                            <a href="{{ url_for('tableau_connect') }}" class="btn btn-primary">
+                                <i class="bi bi-box-arrow-in-right"></i> Connect to Tableau
+                            </a>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Dataset Preview Modal -->
+                    <div class="modal fade" id="datasetPreviewModal" tabindex="-1">
+                        <div class="modal-dialog modal-xl">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Dataset Preview: <span id="datasetName"></span></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div id="datasetPreview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Confirmation Modal -->
+                    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Confirm Delete</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to delete the dataset: <strong id="deleteDatasetName"></strong>?</p>
+                                    <p class="text-danger">This action cannot be undone.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Dataset</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+            <script>
+                function viewDatasetPreview(dataset) {
+                    document.getElementById('datasetName').textContent = dataset;
+                    const previewDiv = document.getElementById('datasetPreview');
+                    previewDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading preview...</p></div>';
+                    
+                    // Show modal
+                    const modal = new bootstrap.Modal(document.getElementById('datasetPreviewModal'));
+                    modal.show();
+                    
+                    // Fetch preview
+                    fetch(`/api/datasets/${dataset}/preview`)
+                        .then(response => response.text())
+                        .then(html => {
+                            previewDiv.innerHTML = html;
+                        })
+                        .catch(error => {
+                            previewDiv.innerHTML = `<div class="alert alert-danger">Failed to load preview: ${error}</div>`;
+                        });
+                }
+                
+                function confirmDelete(dataset) {
+                    // Set the dataset name in the modal
+                    document.getElementById('deleteDatasetName').textContent = dataset;
+                    
+                    // Show confirmation modal
+                    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    modal.show();
+                    
+                    // Setup confirm button action
+                    const confirmBtn = document.getElementById('confirmDeleteBtn');
+                    
+                    // Remove any existing event listeners
+                    const newConfirmBtn = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                    
+                    // Add new event listener
+                    newConfirmBtn.addEventListener('click', function() {
+                        deleteDataset(dataset, modal);
+                    });
+                }
+                
+                function deleteDataset(dataset, modal) {
+                    // Show loading state
+                    const confirmBtn = document.getElementById('confirmDeleteBtn');
+                    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+                    confirmBtn.disabled = true;
+                    
+                    // Delete the dataset
+                    fetch(`/api/datasets/${dataset}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Hide modal
+                        modal.hide();
+                        
+                        if (data.success) {
+                            // Show success message
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                            alertDiv.innerHTML = `
+                                Dataset <strong>${dataset}</strong> has been deleted successfully.
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            `;
+                            document.querySelector('.container').prepend(alertDiv);
+                            
+                            // Remove dataset card from page
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            // Show error message
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                            alertDiv.innerHTML = `
+                                Failed to delete dataset: ${data.error || 'Unknown error'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            `;
+                            document.querySelector('.container').prepend(alertDiv);
+                        }
+                    })
+                    .catch(error => {
+                        // Hide modal
+                        modal.hide();
+                        
+                        // Show error message
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                        alertDiv.innerHTML = `
+                            Failed to delete dataset: ${error.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        `;
+                        document.querySelector('.container').prepend(alertDiv);
+                        });
+                }
+            </script>
+        </body>
+        </html>
+    ''', datasets=datasets, get_dataset_row_count=get_dataset_row_count)
+
+@app.route('/qa-page')
+@login_required
+@role_required(['power', 'superadmin'])
+def qa_page():
+    dataset = request.args.get('dataset')
+    datasets = get_saved_datasets()
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ask Questions - Tableau Data Reporter</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { padding: 20px; }
+                .chat-container {
+                    height: 400px;
+                    overflow-y: auto;
+                    border: 1px solid #dee2e6;
+                    border-radius: 0.25rem;
+                    padding: 1rem;
+                    margin-bottom: 1rem;
+                }
+                .chat-message {
+                    margin-bottom: 1rem;
+                    padding: 0.5rem;
+                    border-radius: 0.25rem;
+                }
+                .user-message {
+                    background-color: #e9ecef;
+                    margin-left: 20%;
+                }
+                .assistant-message {
+                    background-color: #f8f9fa;
+                    margin-right: 20%;
+                }
+                #visualization {
+                    width: 100%;
+                    height: 400px;
+                    margin-top: 1rem;
+                    border: 1px solid #dee2e6;
+                    border-radius: 0.25rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .vis-placeholder {
+                    color: #6c757d;
+                    text-align: center;
+                    font-style: italic;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h1>❓ Ask Questions About Your Data</h1>
+                            <a href="{{ url_for('home') }}" class="btn btn-outline-primary">← Back</a>
+                        </div>
+                        
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <form id="questionForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Select Dataset</label>
+                                        <select class="form-select" name="dataset" required>
+                                            <option value="">Choose a dataset...</option>
+                                            {% for ds in datasets %}
+                                                <option value="{{ ds }}"
+                                                        {% if ds == dataset %}selected{% endif %}>
+                                                    {{ ds }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Your Question</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" name="question"
+                                                   placeholder="Ask a question about your data..."
+                                                   required>
+                                            <button type="submit" class="btn btn-primary">
+                                                Ask Question
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Conversation</h5>
+                                        <div id="chatContainer" class="chat-container"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Visualization</h5>
+                                        <div id="visualization">
+                                            <div class="vis-placeholder">Ask a question to see visualization</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
+            <script>
+                const questionForm = document.getElementById('questionForm');
+                const chatContainer = document.getElementById('chatContainer');
+                const visualizationDiv = document.getElementById('visualization');
+                
+                // Initialize visualization area
+                visualizationDiv.innerHTML = '<div class="vis-placeholder">Ask a question to see visualization</div>';
+                
+                questionForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(questionForm);
+                    const dataset = formData.get('dataset');
+                    const question = formData.get('question');
+                    
+                    // Clear previous visualization
+                    visualizationDiv.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+                    
+                    // Add user message to chat
+from flask import Flask, render_template_string, redirect, url_for, request, jsonify, send_from_directory, session, flash
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+import sqlite3
+from user_management import UserManagement
+from report_manager_new import ReportManager
+from data_analyzer import DataAnalyzer
+from report_formatter_new import ReportFormatter
+from tableau_utils import authenticate, get_workbooks, download_and_save_data, generate_table_name
+import pytz
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import pandas as pd
+from dotenv import load_dotenv
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from werkzeug.utils import secure_filename
+import uuid
+import hashlib
+import shutil
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color
+from reportlab.graphics.shapes import Image
+from reportlab.platypus import Spacer
+from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('app')
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure all required directories exist
+from setup import ensure_directories
+ensure_directories()
+
+# Use writeable directory for Heroku
+STATIC_FOLDER = '/tmp/frontend/build'
+if os.environ.get('DYNO'):  # Check if running on Heroku
+    # Create directory if it doesn't exist
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+    # Write index.html to this directory
+    with open(os.path.join(STATIC_FOLDER, 'index.html'), 'w') as f:
+        f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+else:
+    STATIC_FOLDER = 'frontend/build'
+
+# Create Flask app with proper static file configuration
+app = Flask(__name__, 
+            static_folder=STATIC_FOLDER,
+            static_url_path='/')
+app.secret_key = os.urandom(24)  # For session management
+
+# Serve frontend from static directory
+@app.route('/')
+def serve_frontend():
     # Print more debug information
     logger.debug(f"Current working directory: {os.getcwd()}")
     logger.debug(f"Directory contents: {os.listdir('.')}")
@@ -680,13 +3553,6 @@ def logout():
 @app.route('/<path:path>')
 def catch_all(path):
     logger.debug(f"Request for path: {path}")
-    
-    # Skip API and known application routes
-    if path.startswith('api/') or path in ['login', 'register', 'dashboard', 'logout', 'admin_users', 
-                                          'admin_organizations', 'admin_system', 'admin-dashboard',
-                                          'normal-user', 'power-user', 'qa-page', 'tableau-connect', 
-                                          'select-tableau-workbook', 'schedule-reports', 'manage-schedules']:
-        return f"404 - Page not found. Path: {path}", 404
     
     # First try to send as a static file
     try:
