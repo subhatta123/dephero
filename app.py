@@ -29,6 +29,11 @@ from reportlab.lib.colors import Color
 from reportlab.graphics.shapes import Image
 from reportlab.platypus import Spacer
 from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('app')
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,24 +44,43 @@ ensure_directories()
 
 # Create Flask app with proper static file configuration
 app = Flask(__name__, 
-            static_folder='static',
-            static_url_path='/static')
+            static_folder='frontend/build',
+            static_url_path='/')
 app.secret_key = os.urandom(24)  # For session management
 
 # Serve frontend from static directory
 @app.route('/')
 def serve_frontend():
-    return send_from_directory('static', 'index.html')
+    logger.debug(f"Request for path: ")
+    logger.debug(f"Static folder is: {app.static_folder}")
+    print(f"Serving path: ")
+    
+    # Check if index.html exists
+    index_path = os.path.join(app.static_folder, 'index.html')
+    if not os.path.exists(index_path):
+        print(f"WARNING: index.html not found at {index_path}")
+    
+    try:
+        return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        logger.error(f"Error serving index.html: {str(e)}")
+        return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
 
 # Catch-all route to handle frontend routing
 @app.route('/<path:path>')
 def catch_all(path):
+    logger.debug(f"Request for path: {path}")
     # First try to send as a static file
     try:
-        return send_from_directory('static', path)
-    except:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.debug(f"Error serving static file: {str(e)}")
         # If not a static file, serve the index.html for SPA routing
-        return send_from_directory('static', 'index.html')
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
 
 # Initialize managers
 user_manager = UserManagement()
@@ -185,7 +209,7 @@ def role_required(roles):
         def decorated_function(*args, **kwargs):
             if 'user' not in session or session['user'].get('role') not in roles:
                 flash('Access denied')
-                return redirect(url_for('home'))
+                return redirect(url_for('dashboard'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -253,7 +277,7 @@ def login():
                     'organization_name': user[5]
                 }
                 flash('Login successful!')
-                return redirect(url_for('home'))
+                return redirect(url_for('dashboard'))
         
         # Regular authentication for other users
         user = user_manager.verify_user(username, password)
@@ -267,7 +291,7 @@ def login():
                 'organization_name': user[5]
             }
             flash('Login successful!')
-            return redirect(url_for('home'))
+            return redirect(url_for('dashboard'))
         flash('Invalid credentials')
     
     return render_template_string('''
@@ -339,7 +363,7 @@ def register():
                     email=email
                 ):
                     flash('Registration successful! Please login.')
-                    return redirect(url_for('login'))
+                    return redirect(url_for('dashboard'))
             except ValueError as e:
                 flash(str(e))
     
@@ -398,7 +422,7 @@ def register():
         </html>
     ''')
 
-@app.route('/')
+@app.route('/dashboard')
 def home():
     if 'user' not in session:
         return redirect(url_for('login'))
@@ -2826,7 +2850,7 @@ def process_workbook_selection():
             
             if success:
                 flash(f'Data downloaded successfully and saved as "{table_name}"')
-                return redirect(url_for('home'))
+                return redirect(url_for('dashboard'))
             else:
                 flash('Failed to download data from Tableau')
                 return redirect(url_for('select_tableau_workbook'))
