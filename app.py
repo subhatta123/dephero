@@ -42,29 +42,255 @@ load_dotenv()
 from setup import ensure_directories
 ensure_directories()
 
+# Use writeable directory for Heroku
+STATIC_FOLDER = '/tmp/frontend/build'
+if os.environ.get('DYNO'):  # Check if running on Heroku
+    # Create directory if it doesn't exist
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+    # Write index.html to this directory
+    with open(os.path.join(STATIC_FOLDER, 'index.html'), 'w') as f:
+        f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+else:
+    STATIC_FOLDER = 'frontend/build'
+
 # Create Flask app with proper static file configuration
 app = Flask(__name__, 
-            static_folder='frontend/build',
+            static_folder=STATIC_FOLDER,
             static_url_path='/')
 app.secret_key = os.urandom(24)  # For session management
 
 # Serve frontend from static directory
 @app.route('/')
 def serve_frontend():
+    # Print more debug information
+    logger.debug(f"Current working directory: {os.getcwd()}")
+    logger.debug(f"Directory contents: {os.listdir('.')}")
+    
+    # Check if frontend/build exists
+    if os.path.exists('frontend'):
+        logger.debug(f"Frontend directory exists. Contents: {os.listdir('frontend')}")
+        if os.path.exists('frontend/build'):
+            logger.debug(f"Frontend/build directory exists. Contents: {os.listdir('frontend/build')}")
+    
     logger.debug(f"Request for path: ")
     logger.debug(f"Static folder is: {app.static_folder}")
+    logger.debug(f"Static folder absolute path: {os.path.abspath(app.static_folder)}")
     print(f"Serving path: ")
     
     # Check if index.html exists
     index_path = os.path.join(app.static_folder, 'index.html')
+    logger.debug(f"Looking for index.html at: {index_path}")
+    logger.debug(f"Absolute path: {os.path.abspath(index_path)}")
+    
     if not os.path.exists(index_path):
-        print(f"WARNING: index.html not found at {index_path}")
+        logger.warning(f"WARNING: index.html not found at {index_path}")
+        # Try to create the index.html file directly
+        try:
+            os.makedirs(os.path.dirname(index_path), exist_ok=True)
+            with open(index_path, 'w') as f:
+                f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3a5ce5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>Welcome to the Fincode API Server. The API is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+    </div>
+</body>
+</html>""")
+            logger.info("Successfully created index.html file")
+        except Exception as e:
+            logger.error(f"Failed to create index.html file: {str(e)}")
     
     try:
         return send_from_directory(app.static_folder, 'index.html')
     except Exception as e:
         logger.error(f"Error serving index.html: {str(e)}")
-        return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fincode API Server</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+        }}
+        .container {{
+            max-width: 800px;
+            padding: 40px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }}
+        .button {{
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }}
+        .button:hover {{
+            background-color: #3a5ce5;
+        }}
+        .error {{
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff3f3;
+            border-left: 4px solid #ff6b6b;
+            color: #666;
+            font-size: 14px;
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fincode API Server</h1>
+        <p>API server is running successfully.</p>
+        <p>Please use one of the following routes to access the application:</p>
+        <p>
+            <a href="/login" class="button">Login</a>
+            <a href="/register" class="button">Register</a>
+        </p>
+        <div class="error">
+            <strong>Note:</strong> The frontend file could not be loaded.<br>
+            Error: {str(e)}
+        </div>
+    </div>
+</body>
+</html>"""
 
 # Catch-all route to handle frontend routing
 @app.route('/<path:path>')
