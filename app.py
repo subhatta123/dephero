@@ -37,8 +37,26 @@ load_dotenv()
 from setup import ensure_directories
 ensure_directories()
 
-app = Flask(__name__)
+# Create Flask app with proper static file configuration
+app = Flask(__name__, 
+            static_folder='static',
+            static_url_path='/static')
 app.secret_key = os.urandom(24)  # For session management
+
+# Serve frontend from static directory
+@app.route('/')
+def serve_frontend():
+    return send_from_directory('static', 'index.html')
+
+# Catch-all route to handle frontend routing
+@app.route('/<path:path>')
+def catch_all(path):
+    # First try to send as a static file
+    try:
+        return send_from_directory('static', path)
+    except:
+        # If not a static file, serve the index.html for SPA routing
+        return send_from_directory('static', 'index.html')
 
 # Initialize managers
 user_manager = UserManagement()
