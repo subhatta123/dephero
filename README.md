@@ -1,55 +1,71 @@
-# Tableau Data Reporter
+# Fincode API Server
 
-A Streamlit-based web application for analyzing and reporting Tableau data.
+A comprehensive data analytics and reporting platform built with Flask.
+
+## Deployment to Heroku
+
+### Prerequisites
+
+- A Heroku account
+- Heroku CLI installed
+- Git installed
+
+### Steps to Deploy
+
+1. **Login to Heroku**
+   ```bash
+   heroku login
+   ```
+
+2. **Create a Heroku App**
+   ```bash
+   heroku create your-app-name
+   ```
+
+3. **Set Environment Variables**
+   ```bash
+   heroku config:set SMTP_SERVER=smtp.gmail.com
+   heroku config:set SMTP_PORT=587
+   heroku config:set SENDER_EMAIL=your-email@gmail.com
+   heroku config:set SENDER_PASSWORD=your-password
+   heroku config:set OPENAI_API_KEY=your-openai-key
+   heroku config:set TWILIO_ACCOUNT_SID=your-twilio-sid
+   heroku config:set TWILIO_AUTH_TOKEN=your-twilio-token
+   heroku config:set TWILIO_WHATSAPP_NUMBER=your-twilio-number
+   heroku config:set BASE_URL=https://your-app-name.herokuapp.com
+   heroku config:set ENVIRONMENT=production
+   ```
+
+4. **Push to Heroku**
+   ```bash
+   git push heroku master
+   ```
+
+5. **Open the App**
+   ```bash
+   heroku open
+   ```
+
+## Troubleshooting
+
+If you encounter any issues with the deployment, check the logs:
+```bash
+heroku logs --tail
+```
+
+## Local Development
+
+To run the app locally:
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run the app: `python app.py`
+
+The app will be available at http://localhost:8501.
 
 ## Features
 
-- Connect to Tableau Server and download data
-- Analyze datasets with natural language questions
-- Schedule automated reports
-- Support for email and WhatsApp notifications
-- Interactive data visualizations
-- User management with different permission levels
-
-## Requirements
-
-- Python 3.7+
-- Streamlit
-- Pandas
-- Plotly
-- Tableau Server Client
-- OpenAI API (for Q&A functionality)
-- SQLite3
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/subhatta123/fincode.git
-cd fincode
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Set up environment variables:
-```bash
-OPENAI_API_KEY=your_openai_api_key
-SMTP_SERVER=your_smtp_server
-SMTP_PORT=your_smtp_port
-SENDER_EMAIL=your_sender_email
-SENDER_PASSWORD=your_sender_password
-```
-
-## Usage
-
-Run the application:
-```bash
-streamlit run tableau_streamlit_app.py
-```
-
-## License
-
-MIT License 
+- Tableau integration
+- Report scheduling
+- Data visualization
+- User management
+- Email notifications
+- WhatsApp notifications (via Twilio) 

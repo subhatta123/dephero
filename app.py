@@ -33,6 +33,10 @@ from PIL import Image
 # Load environment variables from .env file
 load_dotenv()
 
+# Ensure all required directories exist
+from setup import ensure_directories
+ensure_directories()
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For session management
 
@@ -5802,5 +5806,6 @@ def save_email_settings_api():
         }), 500
 
 if __name__ == '__main__':
+    # Get port from environment variable (Heroku sets this automatically)
     port = int(os.environ.get('PORT', 8501))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port, debug=os.environ.get('ENVIRONMENT') != 'production') 
