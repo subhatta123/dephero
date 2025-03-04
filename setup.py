@@ -1,5 +1,7 @@
 import os
 import shutil
+import sqlite3
+from datetime import datetime
 
 def ensure_directories():
     """Ensure all required directories exist"""
@@ -83,8 +85,63 @@ def ensure_directories():
     with open('frontend/build/index.html', 'w') as f:
         f.write(index_html_content)
     
+    # Create database files if they don't exist
+    ensure_database_files()
+    
     print("All required directories have been created.")
     print("index.html has been created in frontend/build directory.")
+
+def ensure_database_files():
+    """Create database files if they don't exist"""
+    # Create users database
+    conn = None
+    try:
+        conn = sqlite3.connect('data/users.db')
+        cursor = conn.cursor()
+        
+        # Create users table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT,
+            permission_type TEXT,
+            organization_id INTEGER,
+            email TEXT,
+            created_at TEXT,
+            last_login TEXT
+        )
+        ''')
+        
+        # Create organizations table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS organizations (
+            id INTEGER PRIMARY KEY,
+            name TEXT UNIQUE,
+            created_at TEXT
+        )
+        ''')
+        
+        # Check if default organization exists
+        cursor.execute("SELECT id FROM organizations WHERE name = 'System Organization'")
+        if not cursor.fetchone():
+            # Insert default organization
+            cursor.execute(
+                "INSERT INTO organizations (name, created_at) VALUES (?, ?)",
+                ('System Organization', datetime.now().isoformat())
+            )
+        
+        conn.commit()
+        print("Database files created successfully")
+    except Exception as e:
+        print(f"Error creating database files: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+    
+    # Create tableau data database
+    open('data/tableau_data.db', 'a').close()
 
 if __name__ == "__main__":
     ensure_directories() 

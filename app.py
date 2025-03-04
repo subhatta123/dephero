@@ -292,22 +292,6 @@ def serve_frontend():
 </body>
 </html>"""
 
-# Catch-all route to handle frontend routing
-@app.route('/<path:path>')
-def catch_all(path):
-    logger.debug(f"Request for path: {path}")
-    # First try to send as a static file
-    try:
-        return send_from_directory(app.static_folder, path)
-    except Exception as e:
-        logger.debug(f"Error serving static file: {str(e)}")
-        # If not a static file, serve the index.html for SPA routing
-        try:
-            return send_from_directory(app.static_folder, 'index.html')
-        except Exception as e:
-            logger.error(f"Error serving index.html: {str(e)}")
-            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
-
 # Initialize managers
 user_manager = UserManagement()
 report_manager = ReportManager()
@@ -353,67 +337,80 @@ def validate_image(file):
     except Exception as e:
         return False, f"Error validating image: {str(e)}"
 
-# Ensure superadmin user exists with more robust implementation
+# Function to ensure a superadmin user exists
 def ensure_superadmin_exists():
-    """Ensure the superadmin user exists in the database"""
+    conn = None
     try:
-        print("=== ENSURING SUPERADMIN USER EXISTS ===")
-        with sqlite3.connect('data/tableau_data.db') as conn:
-            cursor = conn.cursor()
-            
-            # First, check if the users table exists
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-            if not cursor.fetchone():
-                print("ERROR: users table does not exist in the database")
-                return False
-            
-            # Get the table structure
-            cursor.execute("PRAGMA table_info(users)")
-            columns = cursor.fetchall()
-            column_names = [col[1] for col in columns]
-            print(f"User table columns: {column_names}")
-            
-            # Find the password column
-            password_column = None
-            for col in ['password_hash', 'password']:
-                if col in column_names:
-                    password_column = col
-                    break
-            
-            if not password_column:
-                print("ERROR: Could not find password column in users table")
-                return False
-            
-            print(f"Using password column: {password_column}")
-            
-            # Check if superadmin exists
-            # Check if superadmin user exists
-            cursor.execute("SELECT rowid FROM users WHERE username = 'superadmin'")
-            result = cursor.fetchone()
-            
-            # Create or update the superadmin user
-            if result:
-                # Update existing superadmin password
-                password_hash = generate_password_hash('superadmin')
-                cursor.execute(
-                    f"UPDATE users SET {password_column} = ?, role = 'superadmin' WHERE username = 'superadmin'",
-                    (password_hash,)
-                )
-                print("Updated superadmin user with password: superadmin")
-            else:
-                # Create new superadmin user
-                password_hash = generate_password_hash('superadmin')
-                cursor.execute(
-                    f"INSERT INTO users (username, {password_column}, role, permission_type) VALUES (?, ?, 'superadmin', 'superadmin')",
-                    ('superadmin', password_hash)
-                )
-                print("Created superadmin user with password: superadmin")
-            
+        # Default superadmin credentials
+        username = 'superadmin'
+        password = 'admin123'  # This will be hashed
+        role = 'superadmin'
+        permission_type = 'full'
+        
+        conn = sqlite3.connect('data/users.db')
+        cursor = conn.cursor()
+        
+        # Check if users table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            # Create users table
+            cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT,
+                role TEXT,
+                permission_type TEXT,
+                organization_id INTEGER,
+                email TEXT,
+                created_at TEXT,
+                last_login TEXT
+            )
+            ''')
             conn.commit()
-            return True
+        
+        # Check if organizations table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'")
+        if not cursor.fetchone():
+            # Create organizations table
+            cursor.execute('''
+            CREATE TABLE organizations (
+                id INTEGER PRIMARY KEY,
+                name TEXT UNIQUE,
+                created_at TEXT
+            )
+            ''')
+            
+            # Insert a default organization
+            cursor.execute(
+                "INSERT INTO organizations (name, created_at) VALUES (?, ?)",
+                ('System Organization', datetime.now().isoformat())
+            )
+            conn.commit()
+        
+        # Get the system organization ID
+        cursor.execute("SELECT id FROM organizations WHERE name = 'System Organization'")
+        org_id = cursor.fetchone()[0]
+        
+        # Check if superadmin exists
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if not cursor.fetchone():
+            # Create superadmin user
+            hashed_password = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (username, password, role, permission_type, organization_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, hashed_password, role, permission_type, org_id, 'superadmin@example.com', datetime.now().isoformat())
+            )
+            conn.commit()
+            print(f"Superadmin user created. Username: {username}, Password: {password}")
+        else:
+            print("Superadmin user already exists.")
+        
     except Exception as e:
-        print(f"Error ensuring superadmin user: {e}")
-        return False
+        print(f"Error ensuring superadmin exists: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
 
 # Call this function when the app starts
 ensure_superadmin_exists()
@@ -464,25 +461,37 @@ def get_dataset_row_count(dataset_name):
 def get_saved_datasets():
     """Get list of saved datasets"""
     try:
+        # Ensure the DB file exists
+        Path('data/tableau_data.db').touch(exist_ok=True)
+        
         with sqlite3.connect('data/tableau_data.db') as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT name FROM sqlite_master 
-                WHERE type='table' 
-                AND name NOT IN (
-                    'users', 
-                    'organizations', 
-                    'schedules', 
-                    'sqlite_sequence', 
-                    'schedule_runs',
-                    '_internal_tableau_connections'
-                )
-                AND name NOT LIKE 'sqlite_%'
-            """)
-            return [row[0] for row in cursor.fetchall()]
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            return [table[0] for table in tables if table[0] != 'sqlite_sequence']
     except Exception as e:
         print(f"Error getting datasets: {str(e)}")
         return []
+
+def verify_superadmin(username, password):
+    """Verify superadmin credentials"""
+    try:
+        with sqlite3.connect('data/users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT u.id, u.username, u.role, u.permission_type, u.organization_id, o.name, u.password "
+                "FROM users u JOIN organizations o ON u.organization_id = o.id "
+                "WHERE u.username = ? AND u.role = 'superadmin'",
+                (username,)
+            )
+            user = cursor.fetchone()
+            if user and check_password_hash(user[6], password):
+                return user[0:6]  # Return user data without password
+    except Exception as e:
+        print(f"Error verifying superadmin: {str(e)}")
+    return None
+
+# Application routes
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -666,6 +675,30 @@ def logout():
     session.clear()
     flash('Logged out successfully')
     return redirect(url_for('login'))
+
+# Catch-all route to handle frontend routing - MUST BE LAST ROUTE
+@app.route('/<path:path>')
+def catch_all(path):
+    logger.debug(f"Request for path: {path}")
+    
+    # Skip API and known application routes
+    if path.startswith('api/') or path in ['login', 'register', 'dashboard', 'logout', 'admin_users', 
+                                          'admin_organizations', 'admin_system', 'admin-dashboard',
+                                          'normal-user', 'power-user', 'qa-page', 'tableau-connect', 
+                                          'select-tableau-workbook', 'schedule-reports', 'manage-schedules']:
+        return f"404 - Page not found. Path: {path}", 404
+    
+    # First try to send as a static file
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.debug(f"Error serving static file: {str(e)}")
+        # If not a static file, serve the index.html for SPA routing
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except Exception as e:
+            logger.error(f"Error serving index.html: {str(e)}")
+            return f"API server is running successfully.<br>Frontend application is not yet built or not found at the expected location.<br>Error: {str(e)}"
 
 @app.route('/normal-user')
 @login_required
